@@ -1,0 +1,86 @@
+#!/bin/bash
+
+set -e
+
+nbd=nbd0
+
+img=arch.img
+size=10G
+user=
+
+usage()
+{
+    cat <<EOF
+Usage: create_drive [-o filename] [-s size] [-u user]
+
+  -o filename   Path of the image to generate. Default to $img.
+  -s size       Size of the image to generate. Default to $size.
+  -u user       This program must be run as root. This option allows
+                to change the owner of the generated image.
+EOF
+}
+
+while getopts ho:s:u: opt; do
+    case "$opt" in
+        o)
+            img="$OPTARG"
+            ;;
+        s)
+            size="$OPTARG"
+            ;;
+        u)
+            user="$OPTARG"
+            ;;
+        h)
+            usage
+            exit 0
+            ;;
+        ?)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+if [ ! -x /usr/bin/pacstrap ]; then
+    echo "pacstrap is missing" >&2
+    exit 1
+fi
+
+if [ ! -x /usr/bin/arch-chroot ]; then
+    echo "arch-chroot is missing" >&2
+    exit 1
+fi
+
+if [ $(id -u) -ne 0 ]; then
+    echo "Must be run as root" >&2
+    exit 1
+fi
+
+modprobe nbd
+qemu-img create -f qcow2 "$img" "$size"
+qemu-nbd --discard=on -c /dev/$nbd "$img"
+mkfs.ext4 /dev/$nbd
+mount_point="$(mktemp -d)"
+mount /dev/$nbd "$mount_point"
+
+pacstrap -c -G "$mount_point" bash bzip2 coreutils diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip iproute2 iputils less pacman pciutils procps-ng psmisc sed shadow sysfsutils systemd tar util-linux vi which
+cat > "$mount_point"/etc/systemd/network/zz-default.network <<EOF
+[Network]
+DHCP=v4
+
+[DHCPv4]
+UseMTU=true
+EOF
+rm "$mount_point"/etc/resolv.conf
+ln -s ../run/systemd/resolve/resolv.conf "$mount_point"/etc/resolv.conf
+arch-chroot "$mount_point" systemctl enable systemd-networkd
+arch-chroot "$mount_point" systemctl enable systemd-resolved
+
+umount "$mount_point"
+rmdir "$mount_point"
+qemu-nbd -d /dev/$nbd
+
+if [ -n "$user" ]; then
+    chown "$user": "$img"
+fi
