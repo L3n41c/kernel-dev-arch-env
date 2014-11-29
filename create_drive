@@ -77,6 +77,11 @@ ln -s ../run/systemd/resolve/resolv.conf "$mount_point"/etc/resolv.conf
 arch-chroot "$mount_point" systemctl enable systemd-networkd
 arch-chroot "$mount_point" systemctl enable systemd-resolved
 
+mkdir "$mount_point"/mnt/host
+cat > "$mount_point"/etc/fstab << EOF
+host	/mnt/host	9p	ro,trans=virtio,version=9p2000.L	0 0
+EOF
+
 umount "$mount_point"
 rmdir "$mount_point"
 qemu-nbd -d /dev/$nbd

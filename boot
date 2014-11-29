@@ -41,6 +41,8 @@ exec qemu-system-$(uname -m) \
     -kernel "$kernel" \
     -drive file="$drive",if=virtio \
     -append "root=/dev/vda rw init=/usr/lib/systemd/systemd console=hvc0" \
+    -fsdev local,id=fsdev-fs0,path=$HOME,security_model=none,readonly \
+    -device virtio-9p-pci,fsdev=fsdev-fs0,mount_tag=host \
     -chardev stdio,id=stdio,mux=on \
     -device virtio-serial-pci \
     -device virtconsole,chardev=stdio \
