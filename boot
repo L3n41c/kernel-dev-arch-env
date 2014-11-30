@@ -40,10 +40,10 @@ exec qemu-system-$(uname -m) \
     -m 2048 \
     -kernel "$kernel" \
     -drive file="$drive",if=virtio \
-    -append "root=/dev/vda rw init=/usr/lib/systemd/systemd console=hvc0" \
+    -append "root=/dev/vda rw init=/usr/lib/systemd/systemd console=hvc0 term=$TERM tty_lines=$(tput lines) tty_cols=$(tput cols)" \
     -fsdev local,id=fsdev-fs0,path=$HOME,security_model=none,readonly \
     -device virtio-9p-pci,fsdev=fsdev-fs0,mount_tag=host \
-    -chardev stdio,id=stdio,mux=on \
+    -chardev stdio,id=stdio,mux=on,signal=off \
     -device virtio-serial-pci \
     -device virtconsole,chardev=stdio \
     -mon chardev=stdio \

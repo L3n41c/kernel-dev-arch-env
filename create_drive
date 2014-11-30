@@ -65,6 +65,7 @@ mount_point="$(mktemp -d)"
 mount /dev/$nbd "$mount_point"
 
 pacstrap -c -G "$mount_point" bash bzip2 coreutils diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip iproute2 iputils less pacman pciutils procps-ng psmisc sed shadow sysfsutils systemd tar util-linux vi which
+
 cat > "$mount_point"/etc/systemd/network/zz-default.network <<EOF
 [Network]
 DHCP=v4
@@ -80,6 +81,14 @@ arch-chroot "$mount_point" systemctl enable systemd-resolved
 mkdir "$mount_point"/mnt/host
 cat > "$mount_point"/etc/fstab << EOF
 host	/mnt/host	9p	ro,trans=virtio,version=9p2000.L	0 0
+EOF
+
+cat > "$mount_point"/etc/profile.d/set_tty.sh <<EOF
+export TERM=\$(awk -v RS=' ' -v FS='=' '\$1 == "term" {print \$2}' < /proc/cmdline)
+tput init
+stty rows \$(awk -v RS=' ' -v FS='=' '\$1 == "tty_lines" {print \$2}' < /proc/cmdline)
+stty cols \$(awk -v RS=' ' -v FS='=' '\$1 == "tty_cols"  {print \$2}' < /proc/cmdline)
+kill -s WINCH \$\$
 EOF
 
 umount "$mount_point"
