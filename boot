@@ -50,5 +50,4 @@ exec qemu-system-$(uname -m) \
     -net nic,model=virtio -net user \
     -balloon virtio \
     -display none \
-    -nographic \
     -s
