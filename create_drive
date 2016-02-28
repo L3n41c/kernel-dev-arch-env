@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -e
+set -euo pipefail
 
 nbd=nbd0
 
@@ -8,6 +7,37 @@ img=arch.img
 size=10G
 type=qcow2
 user=
+
+# packages to ignore for space savings
+readonly packages_to_skip=(
+    cryptsetup
+    device-mapper
+    dhcpcd
+    inetutils
+    iputils
+    jfsutils
+    licenses
+    linux
+    lvm2
+    man-db
+    man-pages
+    mdadm
+    nano
+    netctl
+    openresolv
+    pcmciautils
+    reiserfsprogs
+    s-nail
+    systemd-sysvcompat
+    usbutils
+    vi
+    xfsprogs
+)
+
+readonly packages_to_add=(
+    systemd
+    haveged
+)
 
 usage()
 {
@@ -47,30 +77,36 @@ while getopts ho:s:t:u: opt; do
     esac
 done
 
-if [[ ! -x /usr/bin/pacstrap ]]; then
+hash pacstrap >&/dev/null || {
     echo "pacstrap is missing" >&2
     exit 1
-fi
+}
 
-if [[ ! -x /usr/bin/arch-chroot ]]; then
+hash arch-chroot >&/dev/null || {
     echo "arch-chroot is missing" >&2
     exit 1
-fi
+}
 
 if [[ $(id -u) -ne 0 ]]; then
     echo "Must be run as root" >&2
     exit 1
 fi
 
+readonly img_file="${img##*/}"
+readonly img_dir="${img%${img_file}}"
+readonly img_base="${img_file%.*}"
+readonly img_ext="${img_file##${img_base}}"
+readonly img_wip="${img_dir}${img_base}-WIP${img_ext}"
+
 if [[ "$type" == "qcow2" ]]; then
     modprobe nbd
-    qemu-img create -f "$type" "$img" "$size"
-    qemu-nbd --discard=on -c /dev/$nbd "$img"
+    qemu-img create -f "$type" "$img_wip" "$size"
+    qemu-nbd --discard=on -c /dev/$nbd "$img_wip"
     device=/dev/$nbd
 elif [[ "$type" == "raw" ]]; then
-    truncate -s "$size" "$img"
-    losetup -f "$img"
-    device=$(losetup -j "$img" | cut -d: -f1)
+    truncate -s "$size" "$img_wip"
+    losetup -f "$img_wip"
+    device=$(losetup -j "$img_wip" | cut -d: -f1)
 else
     echo "type must be either qcow2 or raw. Got $type." >&2
     exit 1
@@ -79,7 +115,25 @@ mkfs.ext4 $device
 mount_point="$(mktemp -d)"
 mount -o discard $device "$mount_point"
 
-pacstrap -c -G "$mount_point" bash bzip2 coreutils diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip iproute2 iputils less pacman pciutils procps-ng psmisc sed shadow sysfsutils systemd tar util-linux vi which
+function cleanup {
+    set +e
+    umount "$mount_point"
+    rmdir "$mount_point"
+    if [[ "$type" == "qcow2" ]]; then
+        qemu-nbd -d $device
+    elif [[ "$type" == "raw" ]]; then
+        losetup -d $device
+    else
+        echo "BUG" >&2
+    fi
+    rm -f "$img_wip"
+    set -e
+}
+trap cleanup EXIT
+
+readonly base_packages=($(pacman -Sg base | cut -d' ' -f2))
+readonly packages_to_install="$(comm -23 <(IFS=$'\n'; sort <<<"${base_packages[*]}") <(IFS=$'\n'; sort <<<"${packages_to_skip[*]}")) ${packages_to_add[@]}"
+pacstrap -c -G "$mount_point" $packages_to_install
 
 cat > "$mount_point"/etc/systemd/network/zz-default.network <<EOF
 [Network]
@@ -92,6 +146,7 @@ rm "$mount_point"/etc/resolv.conf
 ln -s ../run/systemd/resolve/resolv.conf "$mount_point"/etc/resolv.conf
 arch-chroot "$mount_point" systemctl enable systemd-networkd
 arch-chroot "$mount_point" systemctl enable systemd-resolved
+sed -i 's/dns/resolve/' "$mount_point"/etc/nsswitch.conf
 
 mkdir "$mount_point"/mnt/host
 cat > "$mount_point"/etc/fstab << EOF
@@ -106,16 +161,7 @@ stty cols \$(awk -v RS=' ' -v FS='=' '\$1 == "tty_cols"  {print \$2}' < /proc/cm
 kill -s WINCH \$\$
 EOF
 
-umount "$mount_point"
-rmdir "$mount_point"
-if [[ "$type" == "qcow2" ]]; then
-    qemu-nbd -d $device
-elif [[ "$type" == "raw" ]]; then
-    losetup -d $device
-else
-    echo "BUG" >&2
-fi
-
+mv "$img_wip" "$img"
 if [ -n "$user" ]; then
     chown "$user": "$img"
 fi

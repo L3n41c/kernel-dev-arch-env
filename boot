@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -e
+set -euo pipefail
 
 drive=arch.img
 kernel=vmlinuz
@@ -36,6 +35,7 @@ done
 
 exec qemu-system-$(uname -m) \
     -machine pc,accel=kvm,usb=off \
+    -cpu host \
     -smp 2 \
     -m 2048 \
     -kernel "$kernel" \
