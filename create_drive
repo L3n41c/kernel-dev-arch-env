@@ -133,7 +133,7 @@ trap cleanup EXIT
 
 readonly base_packages=($(pacman -Sg base | cut -d' ' -f2))
 readonly packages_to_install="$(comm -23 <(IFS=$'\n'; sort <<<"${base_packages[*]}") <(IFS=$'\n'; sort <<<"${packages_to_skip[*]}")) ${packages_to_add[@]}"
-pacstrap -c -G "$mount_point" $packages_to_install
+pacstrap -c -G "$mount_point" $packages_to_install --hookdir /no_hook
 
 cat > "$mount_point"/etc/systemd/network/zz-default.network <<EOF
 [Network]
