@@ -100,7 +100,7 @@ readonly img_wip="${img_dir}${img_base}-WIP${img_ext}"
 
 if [[ "$type" == "qcow2" ]]; then
     modprobe nbd
-    qemu-img create -f "$type" "$img_wip" "$size"
+    qemu-img create -o nocow=on -f "$type" "$img_wip" "$size"
     qemu-nbd --discard=on -c /dev/$nbd "$img_wip"
     device=/dev/$nbd
 elif [[ "$type" == "raw" ]]; then
