@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-drive=arch.img
+drive=arch.raw
 kernel=vmlinuz
 
 usage()
@@ -33,16 +33,18 @@ while getopts hd:k: opt; do
     esac
 done
 
-exec qemu-system-$(uname -m) \
+exec "qemu-system-$(uname -m)" \
     -machine pc,accel=kvm,usb=off \
     -cpu host \
     -smp 2 \
     -m 2048 \
     -kernel "$kernel" \
-    -drive file="$drive",if=virtio \
-    -append "root=/dev/vda rw init=/usr/lib/systemd/systemd console=hvc0 term=$TERM tty_lines=$(tput lines) tty_cols=$(tput cols)" \
+    -device virtio-scsi-pci \
+    -drive file="$drive",format=raw,if=none,id=rootdisk,discard=unmap \
+    -device scsi-hd,drive=rootdisk \
+    -append "root=/dev/sda1 rootflags=autodefrag,discard rw init=/usr/lib/systemd/systemd console=hvc0 term=$TERM tty_lines=$(tput lines) tty_cols=$(tput cols)" \
     -fsdev local,id=fsdev-fs0,path=$HOME,security_model=none,readonly \
-    -device virtio-9p-pci,fsdev=fsdev-fs0,mount_tag=host \
+    -device virtio-9p-pci,fsdev=fsdev-fs0,mount_tag=host_home \
     -chardev stdio,id=stdio,mux=on,signal=off \
     -device virtio-serial-pci \
     -device virtconsole,chardev=stdio \

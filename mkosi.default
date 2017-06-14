@@ -1,0 +1,13 @@
+# Let's build an image that is just good enough to build new mkosi images again
+
+[Distribution]
+Distribution=arch
+
+[Output]
+Output=arch.raw
+Format=raw_btrfs
+Bootable=no
+
+[Packages]
+Packages=
+        btrfs-progs
