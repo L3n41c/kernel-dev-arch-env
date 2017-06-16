@@ -11,3 +11,4 @@ Bootable=no
 [Packages]
 Packages=
         btrfs-progs
+Cache=pacman_cache
