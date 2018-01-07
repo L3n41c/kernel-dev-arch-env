@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-drive=arch.raw
+drive=mkosi.output/image.raw
 kernel=vmlinuz
 
 usage()

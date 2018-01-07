@@ -17,7 +17,7 @@ make -j $(nproc)
 ```
 su
 mkosi
-chown $USER arch.raw
+chown $USER: mkosi.output/image.raw
 ```
 
 ## Boot the kernel
