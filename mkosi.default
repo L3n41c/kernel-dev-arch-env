@@ -2,8 +2,12 @@
 Distribution=arch
 
 [Output]
-Format=raw_btrfs
+Format=gpt_btrfs
+QCow2=yes
 Bootable=no
+
+[Partitions]
+RootSize=2G
 
 [Packages]
 Packages=

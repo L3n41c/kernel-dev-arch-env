@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-drive=mkosi.output/image.raw
+drive=mkosi.output/image.qcow2
 kernel=vmlinuz
 
 usage()
@@ -34,13 +34,14 @@ while getopts hd:k: opt; do
 done
 
 exec "qemu-system-$(uname -m)" \
-    -machine pc,accel=kvm,usb=off \
+    -name kernel-dev-arch-env \
+    -machine q35,accel=kvm,usb=off,vmport=off \
     -cpu host \
     -smp 2 \
     -m 2048 \
     -kernel "$kernel" \
     -device virtio-scsi-pci \
-    -drive file="$drive",format=raw,if=none,id=rootdisk,discard=unmap \
+    -drive file="$drive",format=qcow2,if=none,id=rootdisk,discard=unmap \
     -device scsi-hd,drive=rootdisk \
     -append "root=/dev/sda1 rootflags=autodefrag,discard rw init=/usr/lib/systemd/systemd console=hvc0 term=$TERM tty_lines=$(tput lines) tty_cols=$(tput cols)" \
     -fsdev local,id=fsdev-fs0,path=$HOME,security_model=none,readonly \
@@ -50,6 +51,9 @@ exec "qemu-system-$(uname -m)" \
     -device virtconsole,chardev=stdio \
     -mon chardev=stdio \
     -net nic,model=virtio -net user \
-    -balloon virtio \
+    -device virtio-balloon-pci \
+    -object rng-random,id=objrng0,filename=/dev/urandom \
+    -device virtio-rng-pci,rng=objrng0 \
+    -device pvpanic \
     -display none \
     -s
